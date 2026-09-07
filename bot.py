@@ -1,7 +1,10 @@
 import os
+import asyncio
 import discord
 
 from discord.ext import commands
+from discord.ui import View, Select, Button
+
 from dotenv import load_dotenv
 
 import database
@@ -32,23 +35,6 @@ bot = commands.Bot(
 
 
 # =========================================================
-# CONSTANT LINKS
-# =========================================================
-
-RATE_CHANNEL = (
-    "https://discord.com/channels/"
-    "1536684234352230480/"
-    "1546181630497001502"
-)
-
-VOUCHER_CHANNEL = (
-    "https://discord.com/channels/"
-    "1536684234352230480/"
-    "1546181637459542097"
-)
-
-
-# =========================================================
 # ADMIN CHECK
 # =========================================================
 
@@ -56,38 +42,19 @@ def is_admin():
 
     async def predicate(ctx):
 
-        return (
-            ctx.guild is not None
-            and ctx.author.guild_permissions.administrator
-        )
+        if not ctx.guild:
+            return False
+
+        return ctx.author.guild_permissions.administrator
 
     return commands.check(predicate)
-
-
-# =========================================================
-# BOT READY
-# =========================================================
-
-@bot.event
-async def on_ready():
-
-    print("=" * 55)
-    print("             WINTER EXCHANGE")
-    print("=" * 55)
-    print(f"Bot Login : {bot.user}")
-    print(f"Bot ID    : {bot.user.id}")
-    print(f"Servers   : {len(bot.guilds)}")
-    print(f"Prefix    : {PREFIX}")
-    print("=" * 55)
-    print("Winter Exchange is ONLINE!")
-    print("=" * 55)
 
 
 # =========================================================
 # EXCHANGE TYPE
 # =========================================================
 
-def get_exchange_type(source, receiving_currency=None):
+def get_exchange_type(source, receiving):
 
     if source == "INR":
         return "I2C"
@@ -100,81 +67,19 @@ def get_exchange_type(source, receiving_currency=None):
 
     if source == "CRYPTO":
 
-        if receiving_currency == "INR":
+        if receiving == "INR":
             return "C2I"
 
-        if receiving_currency == "NPR":
+        if receiving == "NPR":
             return "C2N"
 
-        if receiving_currency == "BDT":
+        if receiving == "BDT":
             return "C2B"
 
         return "C2C"
 
     return "UNKNOWN"
 
-
-# =========================================================
-# RATE NUMBER
-# =========================================================
-
-def get_rate_number(rate):
-
-    if isinstance(rate, (int, float)):
-        return float(rate)
-
-    text = str(rate)
-
-    if "%" in text:
-        return None
-
-    number = ""
-
-    for char in text:
-
-        if char.isdigit() or char == ".":
-            number += char
-
-    if not number:
-        return None
-
-    return float(number)
-
-# =========================================================
-# CALCULATE EXCHANGE
-# =========================================================
-
-def calculate_exchange(exchange_type, amount):
-
-    if exchange_type == "I2C":
-        usd = amount / 104
-        return f"₹{amount:g}", f"${usd:.2f}"
-
-    elif exchange_type == "C2I":
-        inr = amount * 100
-        return f"${amount:g}", f"₹{inr:.2f}"
-
-    elif exchange_type == "C2C":
-        received = amount * 0.95
-        return f"${amount:g}", f"${received:.2f}"
-
-    elif exchange_type == "N2C":
-        usd = amount / 165
-        return f"रू{amount:g}", f"${usd:.2f}"
-
-    elif exchange_type == "C2N":
-        npr = amount * 150
-        return f"${amount:g}", f"रू{npr:.2f}"
-
-    elif exchange_type == "B2C":
-        usd = amount / 142
-        return f"৳{amount:g}", f"${usd:.2f}"
-
-    elif exchange_type == "C2B":
-        bdt = amount * 118
-        return f"${amount:g}", f"৳{bdt:.2f}"
-
-    return str(amount), "Unknown"
 
 # =========================================================
 # RATE TEXT
@@ -201,17 +106,94 @@ def rate_text():
 
 
 # =========================================================
+# CALCULATE EXCHANGE
+# =========================================================
+
+def calculate_exchange(
+    exchange_type,
+    amount
+):
+
+    if exchange_type == "I2C":
+
+        usd = amount / 104
+
+        return (
+            f"₹{amount:g}",
+            f"${usd:.2f}"
+        )
+
+    elif exchange_type == "C2I":
+
+        inr = amount * 100
+
+        return (
+            f"${amount:g}",
+            f"₹{inr:.2f}"
+        )
+
+    elif exchange_type == "C2C":
+
+        received = amount * 0.95
+
+        return (
+            f"${amount:g}",
+            f"${received:.2f}"
+        )
+
+    elif exchange_type == "N2C":
+
+        usd = amount / 165
+
+        return (
+            f"रू{amount:g}",
+            f"${usd:.2f}"
+        )
+
+    elif exchange_type == "C2N":
+
+        npr = amount * 150
+
+        return (
+            f"${amount:g}",
+            f"रू{npr:.2f}"
+        )
+
+    elif exchange_type == "B2C":
+
+        usd = amount / 142
+
+        return (
+            f"৳{amount:g}",
+            f"${usd:.2f}"
+        )
+
+    elif exchange_type == "C2B":
+
+        bdt = amount * 118
+
+        return (
+            f"${amount:g}",
+            f"৳{bdt:.2f}"
+        )
+
+    return (
+        str(amount),
+        "Unknown"
+    )
+
+
+# =========================================================
 # RATE BUTTON
 # =========================================================
 
-class RateButton(discord.ui.Button):
+class RateButton(Button):
 
     def __init__(self):
 
         super().__init__(
             label="Rates",
-            style=discord.ButtonStyle.secondary,
-            custom_id="winter_rates"
+            style=discord.ButtonStyle.secondary
         )
 
     async def callback(self, interaction):
@@ -232,14 +214,13 @@ class RateButton(discord.ui.Button):
 # CREATE TICKET BUTTON
 # =========================================================
 
-class CreateTicketButton(discord.ui.Button):
+class CreateTicketButton(Button):
 
     def __init__(self):
 
         super().__init__(
             label="Create Ticket",
-            style=discord.ButtonStyle.primary,
-            custom_id="winter_create_ticket"
+            style=discord.ButtonStyle.primary
         )
 
     async def callback(self, interaction):
@@ -255,37 +236,48 @@ class CreateTicketButton(discord.ui.Button):
 # PANEL VIEW
 # =========================================================
 
-class PanelView(discord.ui.View):
+class PanelView(View):
 
     def __init__(self):
 
-        super().__init__(timeout=None)
+        super().__init__(
+            timeout=None
+        )
 
-        self.add_item(CreateTicketButton())
-        self.add_item(RateButton())
+        self.add_item(
+            CreateTicketButton()
+        )
+
+        self.add_item(
+            RateButton()
+        )
 
 
 # =========================================================
 # CURRENCY SELECT
 # =========================================================
 
-class CurrencySelect(discord.ui.Select):
+class CurrencySelect(Select):
 
     def __init__(self):
 
         options = [
+
             discord.SelectOption(
                 label="INR",
                 description="Indian Rupee"
             ),
+
             discord.SelectOption(
                 label="NPR",
                 description="Nepalese Rupee"
             ),
+
             discord.SelectOption(
                 label="BDT",
                 description="Bangladeshi Taka"
             ),
+
             discord.SelectOption(
                 label="Crypto",
                 description="Cryptocurrency"
@@ -305,7 +297,7 @@ class CurrencySelect(discord.ui.Select):
 
             await interaction.response.edit_message(
                 content="### Choose the Crypto you are sending",
-                view=CryptoSendingView()
+                view=CryptoSendingView(source)
             )
 
         else:
@@ -316,27 +308,33 @@ class CurrencySelect(discord.ui.Select):
             )
 
 
-class CurrencyView(discord.ui.View):
+class CurrencyView(View):
 
     def __init__(self):
 
-        super().__init__(timeout=300)
+        super().__init__(
+            timeout=300
+        )
 
-        self.add_item(CurrencySelect())
+        self.add_item(
+            CurrencySelect()
+        )
 
 
 # =========================================================
 # PAYMENT SELECT
 # =========================================================
 
-class PaymentSelect(discord.ui.Select):
+class PaymentSelect(Select):
 
     def __init__(self, source):
 
         self.source = source
 
         options = [
-            discord.SelectOption(label=x)
+            discord.SelectOption(
+                label=x
+            )
             for x in PAYMENT_METHODS[source]
         ]
 
@@ -359,11 +357,13 @@ class PaymentSelect(discord.ui.Select):
         )
 
 
-class PaymentView(discord.ui.View):
+class PaymentView(View):
 
     def __init__(self, source):
 
-        super().__init__(timeout=300)
+        super().__init__(
+            timeout=300
+        )
 
         self.add_item(
             PaymentSelect(source)
@@ -374,12 +374,16 @@ class PaymentView(discord.ui.View):
 # SENDING CRYPTO
 # =========================================================
 
-class SendingCryptoSelect(discord.ui.Select):
+class SendingCryptoSelect(Select):
 
-    def __init__(self):
+    def __init__(self, source):
+
+        self.source = source
 
         options = [
-            discord.SelectOption(label=x)
+            discord.SelectOption(
+                label=x
+            )
             for x in CRYPTO
         ]
 
@@ -395,21 +399,23 @@ class SendingCryptoSelect(discord.ui.Select):
         await interaction.response.edit_message(
             content="### Choose the Crypto you will be receiving",
             view=ReceivingCryptoView(
-                "CRYPTO",
+                self.source,
                 None,
                 crypto
             )
         )
 
 
-class CryptoSendingView(discord.ui.View):
+class CryptoSendingView(View):
 
-    def __init__(self):
+    def __init__(self, source):
 
-        super().__init__(timeout=300)
+        super().__init__(
+            timeout=300
+        )
 
         self.add_item(
-            SendingCryptoSelect()
+            SendingCryptoSelect(source)
         )
 
 
@@ -417,7 +423,7 @@ class CryptoSendingView(discord.ui.View):
 # RECEIVING CRYPTO
 # =========================================================
 
-class ReceivingCryptoSelect(discord.ui.Select):
+class ReceivingCryptoSelect(Select):
 
     def __init__(
         self,
@@ -431,7 +437,9 @@ class ReceivingCryptoSelect(discord.ui.Select):
         self.sending_crypto = sending_crypto
 
         options = [
-            discord.SelectOption(label=x)
+            discord.SelectOption(
+                label=x
+            )
             for x in CRYPTO
         ]
 
@@ -446,8 +454,8 @@ class ReceivingCryptoSelect(discord.ui.Select):
 
         await interaction.response.edit_message(
             content=(
-                "### Enter the amount\n\n"
-                "**Amount:** `0`"
+                "### Enter your amount\n\n"
+                "Use the keypad below to enter the amount."
             ),
             view=KeypadView(
                 self.source,
@@ -458,7 +466,7 @@ class ReceivingCryptoSelect(discord.ui.Select):
         )
 
 
-class ReceivingCryptoView(discord.ui.View):
+class ReceivingCryptoView(View):
 
     def __init__(
         self,
@@ -467,7 +475,9 @@ class ReceivingCryptoView(discord.ui.View):
         sending_crypto
     ):
 
-        super().__init__(timeout=300)
+        super().__init__(
+            timeout=300
+        )
 
         self.add_item(
             ReceivingCryptoSelect(
@@ -479,10 +489,10 @@ class ReceivingCryptoView(discord.ui.View):
 
 
 # =========================================================
-# AMOUNT KEYBOARD
+# KEYPAD
 # =========================================================
 
-class KeypadView(discord.ui.View):
+class KeypadView(View):
 
     def __init__(
         self,
@@ -492,7 +502,9 @@ class KeypadView(discord.ui.View):
         receiving_crypto
     ):
 
-        super().__init__(timeout=300)
+        super().__init__(
+            timeout=300
+        )
 
         self.source = source
         self.payment = payment
@@ -501,64 +513,43 @@ class KeypadView(discord.ui.View):
 
         self.amount = ""
 
-        # 1 2 3
-        self.add_number("1", 0)
-        self.add_number("2", 0)
-        self.add_number("3", 0)
+        numbers = [
+            "1", "2", "3",
+            "4", "5", "6",
+            "7", "8", "9",
+            ".", "0"
+        ]
 
-        # 4 5 6
-        self.add_number("4", 1)
-        self.add_number("5", 1)
-        self.add_number("6", 1)
+        for number in numbers:
 
-        # 7 8 9
-        self.add_number("7", 2)
-        self.add_number("8", 2)
-        self.add_number("9", 2)
+            button = Button(
+                label=number,
+                style=discord.ButtonStyle.secondary
+            )
 
-        # . 0 backspace
-        self.add_number(".", 3)
-        self.add_number("0", 3)
+            button.callback = self.number_callback(
+                number
+            )
 
-        backspace = discord.ui.Button(
+            self.add_item(button)
+
+        delete = Button(
             label="⌫",
-            style=discord.ButtonStyle.danger,
-            row=3
+            style=discord.ButtonStyle.danger
         )
 
-        backspace.callback = self.backspace
-        self.add_item(backspace)
+        delete.callback = self.delete_callback
 
-        # Clear / Confirm
-        clear = discord.ui.Button(
-            label="Clear",
-            style=discord.ButtonStyle.danger,
-            row=4
-        )
+        self.add_item(delete)
 
-        clear.callback = self.clear
-        self.add_item(clear)
-
-        confirm = discord.ui.Button(
+        confirm = Button(
             label="Confirm",
-            style=discord.ButtonStyle.success,
-            row=4
+            style=discord.ButtonStyle.success
         )
 
-        confirm.callback = self.confirm
+        confirm.callback = self.confirm_callback
+
         self.add_item(confirm)
-
-    def add_number(self, number, row):
-
-        button = discord.ui.Button(
-            label=number,
-            style=discord.ButtonStyle.secondary,
-            row=row
-        )
-
-        button.callback = self.number_callback(number)
-
-        self.add_item(button)
 
     def number_callback(self, number):
 
@@ -567,16 +558,21 @@ class KeypadView(discord.ui.View):
             if len(self.amount) >= 15:
 
                 await interaction.response.send_message(
-                    "❌ Maximum amount reached.",
+                    "❌ Maximum amount length reached.",
                     ephemeral=True
                 )
+
                 return
 
             if number == ".":
 
                 if "." in self.amount:
 
-                    await interaction.response.defer()
+                    await interaction.response.send_message(
+                        "❌ You can only use one decimal point.",
+                        ephemeral=True
+                    )
+
                     return
 
                 if not self.amount:
@@ -587,39 +583,33 @@ class KeypadView(discord.ui.View):
 
             await interaction.response.edit_message(
                 content=(
-                    "### Enter the amount\n\n"
-                    f"**Amount:** `{self.amount}`"
+                    "### Enter your amount\n\n"
+                    f"**Amount:** `{self.amount or '0'}`"
                 ),
                 view=self
             )
 
         return callback
 
-    async def backspace(self, interaction):
+    async def delete_callback(
+        self,
+        interaction
+    ):
 
         self.amount = self.amount[:-1]
 
         await interaction.response.edit_message(
             content=(
-                "### Enter the amount\n\n"
+                "### Enter your amount\n\n"
                 f"**Amount:** `{self.amount or '0'}`"
             ),
             view=self
         )
 
-    async def clear(self, interaction):
-
-        self.amount = ""
-
-        await interaction.response.edit_message(
-            content=(
-                "### Enter the amount\n\n"
-                "**Amount:** `0`"
-            ),
-            view=self
-        )
-
-    async def confirm(self, interaction):
+    async def confirm_callback(
+        self,
+        interaction
+    ):
 
         if not self.amount:
 
@@ -627,11 +617,14 @@ class KeypadView(discord.ui.View):
                 "❌ Please enter an amount.",
                 ephemeral=True
             )
+
             return
 
         try:
 
-            amount = float(self.amount)
+            amount = float(
+                self.amount
+            )
 
             if amount <= 0:
                 raise ValueError
@@ -642,7 +635,22 @@ class KeypadView(discord.ui.View):
                 "❌ Invalid amount.",
                 ephemeral=True
             )
+
             return
+
+        if self.source == "CRYPTO":
+
+            exchange_type = get_exchange_type(
+                self.source,
+                self.receiving_crypto
+            )
+
+        else:
+
+            exchange_type = get_exchange_type(
+                self.source,
+                "CRYPTO"
+            )
 
         await interaction.response.edit_message(
             content="⏳ Creating your ticket...",
@@ -651,6 +659,7 @@ class KeypadView(discord.ui.View):
 
         await create_ticket(
             interaction,
+            exchange_type,
             self.source,
             self.payment,
             self.sending_crypto,
@@ -660,11 +669,23 @@ class KeypadView(discord.ui.View):
 
 
 # =========================================================
+# GET STAFF ROLE
+# =========================================================
+
+def get_role_id(exchange_type):
+
+    return database.get_setting(
+        f"role_{exchange_type}"
+    )
+
+
+# =========================================================
 # CREATE TICKET
 # =========================================================
 
 async def create_ticket(
     interaction,
+    exchange_type,
     source,
     payment,
     sending_crypto,
@@ -674,30 +695,25 @@ async def create_ticket(
 
     guild = interaction.guild
 
-    exchange_type = get_exchange_type(
-        source,
-        receiving_crypto
-    )
-
-    counter = database.get_setting(
+    number = database.get_setting(
         "ticket_counter"
     )
 
-    if counter is None:
+    if number is None:
 
         number = 1
 
     else:
 
-        number = int(counter) + 1
+        number = int(number) + 1
 
     database.set_setting(
         "ticket_counter",
         number
     )
 
-    role_id = database.get_setting(
-        f"role_{exchange_type}"
+    role_id = get_role_id(
+        exchange_type
     )
 
     overwrites = {
@@ -729,10 +745,14 @@ async def create_ticket(
                 read_message_history=True
             )
 
-    category = discord.utils.get(
-        guild.categories,
-        name="Winter Tickets"
-    )
+    category = None
+
+    for cat in guild.categories:
+
+        if cat.name.lower() == "winter tickets":
+
+            category = cat
+            break
 
     if category is None:
 
@@ -740,8 +760,12 @@ async def create_ticket(
             "Winter Tickets"
         )
 
+    channel_name = (
+        f"{exchange_type.lower()}-{number:03d}"
+    )
+
     channel = await guild.create_text_channel(
-        f"{exchange_type.lower()}-{number:03d}",
+        channel_name,
         category=category,
         overwrites=overwrites,
         reason="Winter Exchange ticket"
@@ -759,46 +783,32 @@ async def create_ticket(
         amount
     )
 
-    # =====================================================
-    # CALCULATE FROM / TO
-    # =====================================================
-
     from_text, to_text = calculate_exchange(
         exchange_type,
         amount
     )
 
-    # =====================================================
-    # FIRST EMBED
-    # =====================================================
-
     embed = discord.Embed(
-        title="Exchange Details",
+        title="Exchange Summary",
         color=discord.Color.blurple()
     )
 
     embed.add_field(
-        name="From:",
+        name="From",
         value=from_text,
         inline=False
     )
 
     embed.add_field(
-        name="To:",
+        name="Receiving",
         value=to_text,
-        inline=False
-    )
-
-    embed.add_field(
-        name="Customer:",
-        value=interaction.user.mention,
         inline=False
     )
 
     if payment:
 
         embed.add_field(
-            name="Payment Method:",
+            name="Payment App",
             value=payment,
             inline=False
         )
@@ -806,25 +816,30 @@ async def create_ticket(
     if sending_crypto:
 
         embed.add_field(
-            name="Sending Crypto:",
+            name="Sending Crypto",
             value=sending_crypto,
             inline=False
         )
 
-    embed.add_field(
-        name="Receiving Crypto:",
-        value=receiving_crypto,
-        inline=False
-    )
+    if receiving_crypto:
+
+        embed.add_field(
+            name="Receiving Crypto",
+            value=receiving_crypto,
+            inline=False
+        )
 
     embed.add_field(
-        name="Exchange Type:",
+        name="Exchange Type",
         value=exchange_type,
         inline=False
     )
 
     embed.set_footer(
-        text=f"Winter Exchange • Ticket #{number:03d}"
+        text=(
+            f"Winter Exchange • "
+            f"Ticket #{number:03d}"
+        )
     )
 
     await channel.send(
@@ -832,19 +847,17 @@ async def create_ticket(
         embed=embed
     )
 
-        # =====================================================
-    # SAFETY EMBED
-    # =====================================================
-
     safety = discord.Embed(
         title="⚠️ Transaction Safety",
         description=(
             "For your safety, always complete transactions "
             "within your ticket, where funds are securely "
             "held for both parties.\n\n"
+
             "> - We are not responsible for any losses or "
             "scams resulting from transactions conducted "
             "outside the ticket system.\n"
+
             "> - Anyone asking you to move the trade outside "
             "the ticket is very likely attempting to scam you."
         ),
@@ -857,7 +870,10 @@ async def create_ticket(
     )
 
     await interaction.edit_original_response(
-        content=f"✅ Ticket created: {channel.mention}",
+        content=(
+            f"✅ Ticket created: "
+            f"{channel.mention}"
+        ),
         view=None
     )
 
@@ -866,29 +882,44 @@ async def create_ticket(
 # CLAIM BUTTON
 # =========================================================
 
-class ClaimButton(discord.ui.Button):
+class ClaimButton(Button):
 
     def __init__(self):
+
         super().__init__(
             label="Claim Ticket",
             style=discord.ButtonStyle.primary
         )
 
-    async def callback(self, interaction):
+    async def callback(
+        self,
+        interaction
+    ):
 
         ticket = database.get_ticket(
             interaction.channel.id
         )
 
         if not ticket:
+
             await interaction.response.send_message(
                 "❌ This isn't a Winter Exchange ticket.",
                 ephemeral=True
             )
+
             return
 
-        role_id = database.get_setting(
-            f"role_{ticket[4]}"
+        if ticket[11]:
+
+            await interaction.response.send_message(
+                "❌ This ticket is already closed.",
+                ephemeral=True
+            )
+
+            return
+
+        role_id = get_role_id(
+            ticket[4]
         )
 
         if role_id:
@@ -904,6 +935,7 @@ class ClaimButton(discord.ui.Button):
                     "exchanger role.",
                     ephemeral=True
                 )
+
                 return
 
         if ticket[10]:
@@ -912,6 +944,7 @@ class ClaimButton(discord.ui.Button):
                 "❌ This ticket is already claimed.",
                 ephemeral=True
             )
+
             return
 
         database.claim_ticket(
@@ -919,13 +952,25 @@ class ClaimButton(discord.ui.Button):
             interaction.user.id
         )
 
-        await interaction.channel.send(
-            f"🔒 Ticket claimed by {interaction.user.mention}"
-        )
+        try:
+
+            await interaction.channel.edit(
+                name=(
+                    f"{ticket[4].lower()}-"
+                    f"{ticket[2]:03d}-"
+                    f"{interaction.user.name.lower()[:15]}"
+                )
+            )
+
+        except Exception as e:
+
+            print(
+                f"[RENAME ERROR] {e}"
+            )
 
         await interaction.response.send_message(
-            "✅ You claimed this ticket.",
-            ephemeral=True
+            f"🔒 **Ticket Claimed**\n"
+            f"Exchanger: {interaction.user.mention}"
         )
 
 
@@ -933,7 +978,7 @@ class ClaimButton(discord.ui.Button):
 # DONE BUTTON
 # =========================================================
 
-class DoneButton(discord.ui.Button):
+class DoneButton(Button):
 
     def __init__(self):
 
@@ -942,7 +987,10 @@ class DoneButton(discord.ui.Button):
             style=discord.ButtonStyle.success
         )
 
-    async def callback(self, interaction):
+    async def callback(
+        self,
+        interaction
+    ):
 
         ticket = database.get_ticket(
             interaction.channel.id
@@ -954,6 +1002,16 @@ class DoneButton(discord.ui.Button):
                 "❌ This isn't a Winter Exchange ticket.",
                 ephemeral=True
             )
+
+            return
+
+        if ticket[11]:
+
+            await interaction.response.send_message(
+                "❌ This ticket is already closed.",
+                ephemeral=True
+            )
+
             return
 
         claimed = ticket[10]
@@ -964,6 +1022,7 @@ class DoneButton(discord.ui.Button):
                 "❌ This ticket hasn't been claimed.",
                 ephemeral=True
             )
+
             return
 
         if claimed != interaction.user.id:
@@ -973,6 +1032,7 @@ class DoneButton(discord.ui.Button):
                 "this ticket can use Done.",
                 ephemeral=True
             )
+
             return
 
         customer = interaction.guild.get_member(
@@ -985,6 +1045,7 @@ class DoneButton(discord.ui.Button):
                 "❌ Customer could not be found.",
                 ephemeral=True
             )
+
             return
 
         embed = discord.Embed(
@@ -993,7 +1054,8 @@ class DoneButton(discord.ui.Button):
                 f"Hey {customer.mention}!\n\n"
                 "**The Exchange has been Done?**\n\n"
                 "Just for a small confirmation after "
-                "receiving payment, click the button below."
+                "receiving payment click on "
+                "**Yes, Received**."
             ),
             color=discord.Color.green()
         )
@@ -1001,15 +1063,22 @@ class DoneButton(discord.ui.Button):
         await interaction.response.send_message(
             content=customer.mention,
             embed=embed,
-            view=ReceivedView(customer.id)
-      )
-      # =========================================================
-# YES, RECEIVED BUTTON
+            view=ReceivedView(
+                customer.id
+            )
+        )
+
+
+# =========================================================
+# YES RECEIVED BUTTON
 # =========================================================
 
-class ReceivedButton(discord.ui.Button):
+class ReceivedButton(Button):
 
-    def __init__(self, customer_id):
+    def __init__(
+        self,
+        customer_id
+    ):
 
         self.customer_id = customer_id
 
@@ -1018,16 +1087,19 @@ class ReceivedButton(discord.ui.Button):
             style=discord.ButtonStyle.success
         )
 
-    async def callback(self, interaction):
+    async def callback(
+        self,
+        interaction
+    ):
 
-        # Only ticket owner can confirm
         if interaction.user.id != self.customer_id:
 
             await interaction.response.send_message(
-                "❌ Only the person who opened this "
-                "ticket can confirm the payment.",
+                "❌ Only the person who opened "
+                "this ticket can confirm the payment.",
                 ephemeral=True
             )
+
             return
 
         ticket = database.get_ticket(
@@ -1040,6 +1112,16 @@ class ReceivedButton(discord.ui.Button):
                 "❌ Ticket information could not be found.",
                 ephemeral=True
             )
+
+            return
+
+        if ticket[11]:
+
+            await interaction.response.send_message(
+                "❌ This ticket is already closed.",
+                ephemeral=True
+            )
+
             return
 
         exchanger_id = ticket[10]
@@ -1050,17 +1132,32 @@ class ReceivedButton(discord.ui.Button):
                 "❌ No exchanger is assigned to this ticket.",
                 ephemeral=True
             )
+
             return
 
-        amount = float(ticket[8])
+        amount = float(
+            ticket[9]
+        )
 
         from_text, to_text = calculate_exchange(
             ticket[4],
             amount
         )
 
+        exchanger = interaction.guild.get_member(
+            int(exchanger_id)
+        )
+
+        if exchanger:
+
+            exchanger_name = exchanger.name
+
+        else:
+
+            exchanger_name = "Unknown"
+
         # =================================================
-        # FINAL RESPONSE
+        # FINAL CONFIRMATION
         # =================================================
 
         embed = discord.Embed(
@@ -1075,9 +1172,9 @@ class ReceivedButton(discord.ui.Button):
         embed.add_field(
             name="Rate Your Experience",
             value=(
-                "https://discord.com/channels/"
+                "[Click Here](https://discord.com/channels/"
                 "1536684234352230480/"
-                "1546181630497001502"
+                "1546181630497001502)"
             ),
             inline=False
         )
@@ -1085,19 +1182,53 @@ class ReceivedButton(discord.ui.Button):
         embed.add_field(
             name="Voucher the Exchanger",
             value=(
-                "https://discord.com/channels/"
+                "[Click Here](https://discord.com/channels/"
                 "1536684234352230480/"
-                "1546181637459542097"
+                "1546181637459542097)"
             ),
             inline=False
         )
 
+        # Correct rep amount based on amount received
+        if ticket[4] in [
+            "I2C",
+            "N2C",
+            "B2C"
+        ]:
+
+            rep_amount = (
+                float(
+                    to_text.replace(
+                        "$",
+                        ""
+                    )
+                )
+            )
+
+        elif ticket[4] == "C2C":
+
+            rep_amount = (
+                float(
+                    to_text.replace(
+                        "$",
+                        ""
+                    )
+                )
+            )
+
+        else:
+
+            rep_amount = amount
+
+        rep_text = (
+            f"+rep {exchanger_id} "
+            f"{rep_amount:.2f}$ "
+            f"{ticket[7] or 'USDT'} to UPI"
+        )
+
         embed.add_field(
             name="Rep",
-            value=(
-                f"+rep {exchanger_id} "
-                f"{to_text} USDT to UPI"
-            ),
+            value=f"`{rep_text}`",
             inline=False
         )
 
@@ -1106,7 +1237,7 @@ class ReceivedButton(discord.ui.Button):
         )
 
         # =================================================
-        # SEND LOG
+        # LOG
         # =================================================
 
         await send_log(
@@ -1117,14 +1248,23 @@ class ReceivedButton(discord.ui.Button):
         )
 
         # =================================================
-        # CLOSE TICKET
+        # CLOSE DATABASE
         # =================================================
 
         database.close_ticket(
             interaction.channel.id
         )
 
+        # =================================================
+        # CLOSE CHANNEL
+        # =================================================
+
         try:
+
+            await interaction.channel.set_permissions(
+                interaction.guild.default_role,
+                view_channel=False
+            )
 
             await interaction.channel.set_permissions(
                 interaction.user,
@@ -1134,24 +1274,40 @@ class ReceivedButton(discord.ui.Button):
         except Exception as e:
 
             print(
-                f"[PERMISSION ERROR] {e}"
+                f"[CLOSE PERMISSION ERROR] {e}"
             )
+
+        try:
+
+            await interaction.channel.send(
+                "🔒 **Ticket closed.**\n"
+                "The exchange has been completed."
+            )
+
+        except Exception:
+
+            pass
 
 
 # =========================================================
 # RECEIVED VIEW
 # =========================================================
 
-class ReceivedView(discord.ui.View):
+class ReceivedView(View):
 
-    def __init__(self, customer_id):
+    def __init__(
+        self,
+        customer_id
+    ):
 
         super().__init__(
             timeout=None
         )
 
         self.add_item(
-            ReceivedButton(customer_id)
+            ReceivedButton(
+                customer_id
+            )
         )
 
 
@@ -1159,7 +1315,7 @@ class ReceivedView(discord.ui.View):
 # TICKET VIEW
 # =========================================================
 
-class TicketView(discord.ui.View):
+class TicketView(View):
 
     def __init__(self):
 
@@ -1174,8 +1330,10 @@ class TicketView(discord.ui.View):
         self.add_item(
             DoneButton()
         )
-      # =========================================================
-# SEND EXCHANGE LOG
+
+
+# =========================================================
+# SEND LOG
 # =========================================================
 
 async def send_log(
@@ -1191,7 +1349,10 @@ async def send_log(
 
     if not log_channel_id:
 
-        print("[LOG] No log channel configured.")
+        print(
+            "[LOG] No log channel configured."
+        )
+
         return
 
     try:
@@ -1200,14 +1361,23 @@ async def send_log(
             int(log_channel_id)
         )
 
-    except (ValueError, TypeError):
+    except (
+        ValueError,
+        TypeError
+    ):
 
-        print("[LOG] Invalid log channel ID.")
+        print(
+            "[LOG] Invalid log channel ID."
+        )
+
         return
 
     if not log_channel:
 
-        print("[LOG] Log channel not found.")
+        print(
+            "[LOG] Log channel not found."
+        )
+
         return
 
     exchanger = guild.get_member(
@@ -1215,33 +1385,35 @@ async def send_log(
     )
 
     customer = guild.get_member(
-        ticket[3]
+        int(ticket[3])
     )
 
-    amount = float(ticket[8])
+    amount = float(
+        ticket[9]
+    )
 
     from_text, to_text = calculate_exchange(
         ticket[4],
         amount
     )
 
-    exchanger_name = (
-        exchanger.name
-        if exchanger
-        else "Unknown"
-    )
+    if exchanger:
 
-    exchanger_mention = (
-        exchanger.mention
-        if exchanger
-        else f"<@{exchanger_id}>"
-    )
+        exchanger_name = exchanger.name
+        exchanger_mention = exchanger.mention
 
-    customer_text = (
-        customer.mention
-        if customer
-        else f"<@{ticket[3]}>"
-    )
+    else:
+
+        exchanger_name = "Unknown"
+        exchanger_mention = f"<@{exchanger_id}>"
+
+    if customer:
+
+        customer_text = customer.mention
+
+    else:
+
+        customer_text = f"<@{ticket[3]}>"
 
     embed = discord.Embed(
         title="Exchange Details",
@@ -1263,7 +1435,8 @@ async def send_log(
     embed.add_field(
         name="Exchanger:",
         value=(
-            f"- {exchanger_mention}, {exchanger_name}\n"
+            f"- {exchanger_mention}, "
+            f"{exchanger_name}\n"
             f"- ID: {exchanger_id}"
         ),
         inline=False
@@ -1278,27 +1451,29 @@ async def send_log(
         inline=False
     )
 
-    if ticket[5]:
-
-        embed.add_field(
-            name="Payment Method:",
-            value=ticket[5],
-            inline=False
-        )
-
     if ticket[6]:
 
         embed.add_field(
-            name="Sending Crypto:",
+            name="Payment Method:",
             value=ticket[6],
             inline=False
         )
 
-    embed.add_field(
-        name="Receiving Crypto:",
-        value=ticket[7],
-        inline=False
-    )
+    if ticket[7]:
+
+        embed.add_field(
+            name="Sending Crypto:",
+            value=ticket[7],
+            inline=False
+        )
+
+    if ticket[8]:
+
+        embed.add_field(
+            name="Receiving Crypto:",
+            value=ticket[8],
+            inline=False
+        )
 
     embed.add_field(
         name="Exchange Type:",
@@ -1313,7 +1488,10 @@ async def send_log(
     )
 
     embed.set_footer(
-        text=f"Winter Exchange • Ticket #{ticket[2]:03d}"
+        text=(
+            f"Winter Exchange • "
+            f"Ticket #{ticket[2]:03d}"
+        )
     )
 
     try:
@@ -1329,7 +1507,8 @@ async def send_log(
     except Exception as e:
 
         print(
-            f"[LOG ERROR] {type(e).__name__}: {e}"
+            f"[LOG ERROR] "
+            f"{type(e).__name__}: {e}"
         )
 
 
@@ -1456,7 +1635,6 @@ async def exchlog(
         f"{channel.name} ({channel.id})"
     )
 
-
 # =========================================================
 # SET STAFF ROLE
 # =========================================================
@@ -1480,7 +1658,10 @@ async def set_role(
 
 @bot.command(name="I2C")
 @is_admin()
-async def i2c(ctx, role: discord.Role):
+async def i2c(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1491,7 +1672,10 @@ async def i2c(ctx, role: discord.Role):
 
 @bot.command(name="C2I")
 @is_admin()
-async def c2i(ctx, role: discord.Role):
+async def c2i(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1502,7 +1686,10 @@ async def c2i(ctx, role: discord.Role):
 
 @bot.command(name="C2C")
 @is_admin()
-async def c2c(ctx, role: discord.Role):
+async def c2c(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1513,7 +1700,10 @@ async def c2c(ctx, role: discord.Role):
 
 @bot.command(name="N2C")
 @is_admin()
-async def n2c(ctx, role: discord.Role):
+async def n2c(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1524,7 +1714,10 @@ async def n2c(ctx, role: discord.Role):
 
 @bot.command(name="C2N")
 @is_admin()
-async def c2n(ctx, role: discord.Role):
+async def c2n(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1535,7 +1728,10 @@ async def c2n(ctx, role: discord.Role):
 
 @bot.command(name="B2C")
 @is_admin()
-async def b2c(ctx, role: discord.Role):
+async def b2c(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
@@ -1546,14 +1742,19 @@ async def b2c(ctx, role: discord.Role):
 
 @bot.command(name="C2B")
 @is_admin()
-async def c2b(ctx, role: discord.Role):
+async def c2b(
+    ctx,
+    role: discord.Role
+):
 
     await set_role(
         ctx,
         "C2B",
         role
     )
-  # =========================================================
+
+
+# =========================================================
 # DEAL COMMAND
 # =========================================================
 
@@ -1565,13 +1766,23 @@ async def deal(ctx):
     )
 
     if not ticket:
+
         await ctx.send(
             "❌ This isn't a Winter Exchange ticket."
         )
+
         return
 
-    role_id = database.get_setting(
-        f"role_{ticket[4]}"
+    if ticket[11]:
+
+        await ctx.send(
+            "❌ This ticket is already closed."
+        )
+
+        return
+
+    role_id = get_role_id(
+        ticket[4]
     )
 
     if role_id:
@@ -1581,16 +1792,20 @@ async def deal(ctx):
         )
 
         if role and role not in ctx.author.roles:
+
             await ctx.send(
                 "❌ You don't have the required "
                 "exchanger role."
             )
+
             return
 
     if ticket[10]:
+
         await ctx.send(
             "❌ This ticket is already claimed."
         )
+
         return
 
     database.claim_ticket(
@@ -1632,22 +1847,36 @@ async def done(ctx):
     )
 
     if not ticket:
+
         await ctx.send(
             "❌ This isn't a Winter Exchange ticket."
         )
+
+        return
+
+    if ticket[11]:
+
+        await ctx.send(
+            "❌ This ticket is already closed."
+        )
+
         return
 
     if not ticket[10]:
+
         await ctx.send(
             "❌ This ticket hasn't been claimed."
         )
+
         return
 
     if ticket[10] != ctx.author.id:
+
         await ctx.send(
             "❌ Only the exchanger who claimed "
             "this ticket can use `.done`."
         )
+
         return
 
     customer = ctx.guild.get_member(
@@ -1655,9 +1884,11 @@ async def done(ctx):
     )
 
     if not customer:
+
         await ctx.send(
             "❌ The customer could not be found."
         )
+
         return
 
     embed = discord.Embed(
@@ -1666,7 +1897,8 @@ async def done(ctx):
             f"Hey {customer.mention}!\n\n"
             "**The Exchange has been Done?**\n\n"
             "Just for a small confirmation after "
-            "receiving payment click on **Yes, Received**."
+            "receiving payment click on "
+            "**Yes, Received**."
         ),
         color=discord.Color.green()
     )
@@ -1674,7 +1906,9 @@ async def done(ctx):
     await ctx.send(
         content=customer.mention,
         embed=embed,
-        view=ReceivedView(customer.id)
+        view=ReceivedView(
+            customer.id
+        )
     )
 
 
@@ -1691,9 +1925,11 @@ async def delete(ctx):
     )
 
     if not ticket:
+
         await ctx.send(
             "❌ This isn't a Winter Exchange ticket."
         )
+
         return
 
     await ctx.send(
@@ -1705,7 +1941,9 @@ async def delete(ctx):
     try:
 
         await ctx.channel.delete(
-            reason=f"Deleted by {ctx.author}"
+            reason=(
+                f"Deleted by {ctx.author}"
+            )
         )
 
     except Exception as e:
@@ -1728,9 +1966,11 @@ async def reopen(ctx):
     )
 
     if not ticket:
+
         await ctx.send(
             "❌ This isn't a Winter Exchange ticket."
         )
+
         return
 
     database.reopen_ticket(
@@ -1750,8 +1990,8 @@ async def reopen(ctx):
             read_message_history=True
         )
 
-    role_id = database.get_setting(
-        f"role_{ticket[4]}"
+    role_id = get_role_id(
+        ticket[4]
     )
 
     if role_id:
@@ -1792,35 +2032,48 @@ async def on_command_error(
 
     if isinstance(
         error,
+        commands.CommandNotFound
+    ):
+
+        return
+
+    if isinstance(
+        error,
         commands.CheckFailure
     ):
+
         await ctx.send(
             "❌ You need Administrator permissions "
             "to use this command.",
             delete_after=5
         )
+
         return
 
     if isinstance(
         error,
         commands.MissingRequiredArgument
     ):
+
         await ctx.send(
             "❌ Missing argument.\n"
             "Example: `.exchpanel #channel`",
             delete_after=7
         )
+
         return
 
     if isinstance(
         error,
         commands.BadArgument
     ):
+
         await ctx.send(
             "❌ Invalid argument.\n"
             "Please mention the correct channel or role.",
             delete_after=7
         )
+
         return
 
     print(
@@ -1836,24 +2089,29 @@ async def on_command_error(
 @bot.event
 async def on_ready():
 
-    print("=" * 50)
+    print("=" * 55)
     print("❄️ WINTER EXCHANGE")
-    print("=" * 50)
+    print("=" * 55)
+
     print(
         f"✅ Logged in as: "
         f"{bot.user} "
         f"(ID: {bot.user.id})"
     )
+
     print(
         f"📡 Servers: {len(bot.guilds)}"
     )
+
     print(
         f"⚙️ Prefix: {PREFIX}"
     )
+
     print(
         "🚀 Bot is ready!"
     )
-    print("=" * 50)
+
+    print("=" * 55)
 
     try:
 
