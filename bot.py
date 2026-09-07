@@ -141,6 +141,8 @@ def get_rate_number(rate):
     return float(number)
 
 
+        )
+
 # =========================================================
 # CALCULATE EXCHANGE
 # =========================================================
@@ -148,79 +150,34 @@ def get_rate_number(rate):
 def calculate_exchange(exchange_type, amount):
 
     if exchange_type == "I2C":
+        usd = amount / 104
+        return f"₹{amount:g}", f"${usd:.2f}"
 
-        rate = get_rate_number(RATES["I2C"])
-        result = amount / rate
+    elif exchange_type == "C2I":
+        inr = amount * 100
+        return f"${amount:g}", f"₹{inr:.2f}"
 
-        return (
-            f"₹{amount:,.2f}",
-            f"${result:,.2f}"
-        )
+    elif exchange_type == "C2C":
+        received = amount * 0.95
+        return f"${amount:g}", f"${received:.2f}"
 
-    if exchange_type == "C2I":
+    elif exchange_type == "N2C":
+        usd = amount / 165
+        return f"रू{amount:g}", f"${usd:.2f}"
 
-        rate = get_rate_number(RATES["C2I"])
-        result = amount * rate
+    elif exchange_type == "C2N":
+        npr = amount * 150
+        return f"${amount:g}", f"रू{npr:.2f}"
 
-        return (
-            f"${amount:,.2f}",
-            f"₹{result:,.2f}"
-        )
+    elif exchange_type == "B2C":
+        usd = amount / 142
+        return f"৳{amount:g}", f"${usd:.2f}"
 
-    if exchange_type == "N2C":
+    elif exchange_type == "C2B":
+        bdt = amount * 118
+        return f"${amount:g}", f"৳{bdt:.2f}"
 
-        rate = get_rate_number(RATES["N2C"])
-        result = amount / rate
-
-        return (
-            f"₨{amount:,.2f}",
-            f"${result:,.2f}"
-        )
-
-    if exchange_type == "C2N":
-
-        rate = get_rate_number(RATES["C2N"])
-        result = amount * rate
-
-        return (
-            f"${amount:,.2f}",
-            f"₨{result:,.2f}"
-        )
-
-    if exchange_type == "B2C":
-
-        rate = get_rate_number(RATES["B2C"])
-        result = amount / rate
-
-        return (
-            f"৳{amount:,.2f}",
-            f"${result:,.2f}"
-        )
-
-    if exchange_type == "C2B":
-
-        rate = get_rate_number(RATES["C2B"])
-        result = amount * rate
-
-        return (
-            f"${amount:,.2f}",
-            f"৳{result:,.2f}"
-        )
-
-    if exchange_type == "C2C":
-
-        result = amount * 0.95
-
-        return (
-            f"${amount:,.2f}",
-            f"${result:,.2f}"
-        )
-
-    return (
-        str(amount),
-        "Unknown"
-    )
-
+    return str(amount), "Unknown"
 
 # =========================================================
 # RATE TEXT
