@@ -909,4 +909,21 @@ async def send_log(
         return
 
     log_channel = guild.get_channel(
-        int(log_channel_id
+        int(log_channel_id)
+    )
+
+    if not log_channel:
+        return
+
+    # Logging implementation placeholder — add detailed logging here.
+    try:
+        await log_channel.send(
+            f"Ticket #{ticket[2]:03d} closed by {exchanger.mention}"
+        )
+    except Exception:
+        # Fail silently to avoid crashing the bot on logging errors
+        pass
+
+
+# If you want the bot to start when this file is run directly, uncomment below
+# bot.run(TOKEN)
